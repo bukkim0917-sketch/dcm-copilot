@@ -28,7 +28,7 @@ APP_TITLE = "DCM Copilot"
 APP_SUBTITLE = "AI-powered Corporate Funding Analysis"
 
 # n8n 워크플로우에서 LLM을 호출하면 응답이 느릴 수 있어 넉넉히 잡는다.
-REQUEST_TIMEOUT_SECONDS = 120
+REQUEST_TIMEOUT_SECONDS = 360
 
 # 검증 상태 판정에 쓰는 키워드. 대소문자와 구분자(_, -)는 무시하고 비교한다.
 REVIEW_KEYWORDS = ["REVIEW REQUIRED", "REVIEWREQUIRED", "검토 필요", "검토필요"]

@@ -1,0 +1,32 @@
+# --- Streamlit secrets (반드시 제외) ---
+.streamlit/secrets.toml
+!.streamlit/secrets.toml.example
+
+# --- 환경변수 파일 ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+build/
+dist/
+
+# --- 가상환경 ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- 에디터 / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- 로그, 임시 파일 ---
+*.log
+.ipynb_checkpoints/

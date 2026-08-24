@@ -371,6 +371,25 @@ with st.sidebar:
         value=2025,
         step=1,
     )
+    report_period = st.selectbox(
+    "분석기간",
+    options=[
+        "사업보고서(연간)",
+        "반기보고서",
+        "1분기보고서",
+        "3분기보고서",
+    ],
+    index=0,
+)
+
+report_code_map = {
+    "사업보고서(연간)": "11011",
+    "반기보고서": "11012",
+    "1분기보고서": "11013",
+    "3분기보고서": "11014",
+}
+
+reprt_code = report_code_map[report_period]
 
     funding_amount = st.text_input(
         "조달예정금액",
@@ -432,14 +451,15 @@ if analyze_clicked:
     st.session_state.analysis_result = None
     st.session_state.request_id = None
 
-    payload = {
-        "company_name": company_name.strip(),
-        "corp_code": corp_code.strip(),
-        "year": int(year),
-        "funding_amount": funding_amount.strip(),
-        "funding_purpose": funding_purpose.strip(),
-    }
-
+payload = {
+    "company_name": company_name.strip(),
+    "corp_code": corp_code.strip(),
+    "year": int(year),
+    "report_period": report_period,
+    "reprt_code": reprt_code,
+    "funding_amount": funding_amount.strip(),
+    "funding_purpose": funding_purpose.strip(),
+}
     # 필수 입력 검증
     missing = []
 

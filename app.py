@@ -23,8 +23,8 @@ st.set_page_config(
 # Streamlit Cloud를 사용한다면
 # Settings → Secrets에 아래처럼 넣는 것을 권장합니다.
 #
-# START_WEBHOOK_URL = "기존 OpenDART Financial Analysis Production URL"
-# RESULT_WEBHOOK_URL = "새 DCM Result Lookup Production URL"
+# START_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/DCM-analysis"
+# RESULT_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/dcm-result"
 #
 # =========================================================
 

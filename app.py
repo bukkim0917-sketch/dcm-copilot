@@ -128,7 +128,17 @@ st.markdown(
         font-size: 17px;
         font-weight: 700;
     }
+.st-key-final_report,
+.st-key-final_report * {
+    color: #1f2937 !important;
+}
 
+.st-key-final_report h1,
+.st-key-final_report h2,
+.st-key-final_report h3,
+.st-key-final_report h4 {
+    color: #0f2d52 !important;
+}
     </style>
     """,
     unsafe_allow_html=True,
@@ -727,7 +737,9 @@ elif st.session_state.analysis_result is not None:
     if isinstance(result, str):
 
         if result.strip():
-            st.markdown(result)
+            with st.container(key="final_report"):
+                st.markdown(result)
+        
         else:
             st.warning(
                 "분석은 완료되었지만 최종 결과가 비어 있습니다. "

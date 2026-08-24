@@ -128,7 +128,35 @@ st.markdown(
         font-size: 17px;
         font-weight: 700;
     }
+/* 결과 보고서 본문 */
+.stMarkdown,
+.stMarkdown p,
+.stMarkdown li,
+.stMarkdown span,
+.stMarkdown strong,
+.stMarkdown em {
+    color: #1f2937 !important;
+}
 
+/* 결과 보고서 제목 */
+.stMarkdown h1,
+.stMarkdown h2,
+.stMarkdown h3,
+.stMarkdown h4 {
+    color: #0f2d52 !important;
+}
+
+/* 결과 보고서 표 */
+.stMarkdown table,
+.stMarkdown td {
+    color: #1f2937 !important;
+    background-color: #ffffff !important;
+}
+
+.stMarkdown th {
+    color: #0f2d52 !important;
+    background-color: #f3f6fa !important;
+}
     </style>
     """,
     unsafe_allow_html=True,

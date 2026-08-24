@@ -25,8 +25,8 @@ st.set_page_config(
 #
 # 아래 두 값을 등록해야 합니다.
 #
-# START_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/DCM-analysis"
-# RESULT_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/dcm-result"
+START_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/DCM-analysis"
+RESULT_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/dcm-result"
 #
 # 반드시 /webhook-test/ 가 아니라 /webhook/ Production URL 사용
 # =========================================================
@@ -41,8 +41,8 @@ def get_config(name: str) -> str:
     return os.getenv(name, "")
 
 
-START_WEBHOOK_URL = get_config("https://buky87.app.n8n.cloud/webhook/DCM-analysis")
-RESULT_WEBHOOK_URL = get_config("https://buky87.app.n8n.cloud/webhook/dcm-result")
+START_WEBHOOK_URL = get_config("START_WEBHOOK_URL")
+RESULT_WEBHOOK_URL = get_config("RESULT_WEBHOOK_URL")
 
 
 # =========================================================

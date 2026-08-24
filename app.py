@@ -5,7 +5,7 @@ import streamlit as st
 
 
 # =========================================================
-# 1. 기본 설정
+# 1. PAGE CONFIG
 # =========================================================
 
 st.set_page_config(
@@ -17,54 +17,54 @@ st.set_page_config(
 
 
 # =========================================================
-# 2. n8n Webhook URL
+# 2. N8N WEBHOOK URL
 # =========================================================
 #
-# Streamlit Cloud를 사용한다면
-# Settings → Secrets에 아래처럼 넣는 것을 권장합니다.
+# Streamlit Cloud
+# Manage app → Settings → Secrets
 #
-# START_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/DCM-analysis"
-# RESULT_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/dcm-result"
+# 아래 두 값을 등록해야 합니다.
 #
+# START_WEBHOOK_URL = "기존 OpenDART Financial Analysis Production URL"
+# RESULT_WEBHOOK_URL = "DCM Result Lookup Production URL"
+#
+# 반드시 /webhook-test/ 가 아니라 /webhook/ Production URL 사용
 # =========================================================
 
-try:
-    START_WEBHOOK_URL = st.secrets.get(
-        "START_WEBHOOK_URL",
-        os.getenv("START_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/DCM-analysis")
-    )
 
-    RESULT_WEBHOOK_URL = st.secrets.get(
-        "RESULT_WEBHOOK_URL",
-        os.getenv("RESULT_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/dcm-result")
-    )
+def get_config(name: str) -> str:
+    """Streamlit Secrets → 환경변수 순서로 설정값을 읽습니다."""
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:
+        pass
 
-except Exception:
-    START_WEBHOOK_URL = os.getenv("START_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/DCM-analysis")
-    RESULT_WEBHOOK_URL = os.getenv("RESULT_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/dcm-result")
+    return os.getenv(name, "")
+
+
+START_WEBHOOK_URL = get_config("START_WEBHOOK_URL")
+RESULT_WEBHOOK_URL = get_config("RESULT_WEBHOOK_URL")
 
 
 # =========================================================
-# 3. CSS
+# 3. DESIGN / CSS
 # =========================================================
 
 st.markdown(
     """
     <style>
 
-    /* 전체 */
     .stApp {
         background-color: #ffffff;
     }
 
-    /* 메인 영역 최대 폭 */
     .block-container {
         max-width: 1100px;
-        padding-top: 3.0rem;
+        padding-top: 3rem;
         padding-bottom: 4rem;
     }
 
-    /* 제목 */
     .main-title {
         font-size: 46px;
         font-weight: 800;
@@ -92,7 +92,6 @@ st.markdown(
         margin-bottom: 18px;
     }
 
-    /* 안내 박스 */
     .info-box {
         background: #EAF4FC;
         padding: 22px 26px;
@@ -105,7 +104,16 @@ st.markdown(
         margin-bottom: 28px;
     }
 
-    /* 결과 */
+    .scope-box {
+        background: #DCEFFC;
+        padding: 14px 16px;
+        border-radius: 8px;
+        color: #07528C;
+        font-size: 14px;
+        line-height: 1.8;
+        margin-bottom: 18px;
+    }
+
     .result-title {
         font-size: 27px;
         font-weight: 800;
@@ -114,7 +122,6 @@ st.markdown(
         margin-bottom: 12px;
     }
 
-    /* 면책 */
     .disclaimer {
         font-size: 13px;
         color: #69788C;
@@ -122,7 +129,6 @@ st.markdown(
         margin-top: 18px;
     }
 
-    /* 사이드바 */
     [data-testid="stSidebar"] {
         background-color: #F3F6FA;
     }
@@ -131,7 +137,6 @@ st.markdown(
         padding-top: 2rem;
     }
 
-    /* 버튼 */
     div.stButton > button {
         width: 100%;
         border-radius: 8px;
@@ -147,61 +152,101 @@ st.markdown(
 
 
 # =========================================================
-# 4. 상태 초기화
+# 4. SESSION STATE
 # =========================================================
 
-if "analysis_result" not in st.session_state:
-    st.session_state.analysis_result = None
+DEFAULT_STATE = {
+    "analysis_result": None,
+    "request_id": None,
+    "analysis_running": False,
+    "analysis_started_at": None,
+    "analysis_error": None,
+    "last_company": None,
+}
 
-if "request_id" not in st.session_state:
-    st.session_state.request_id = None
-
-if "last_company" not in st.session_state:
-    st.session_state.last_company = None
+for key, value in DEFAULT_STATE.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # =========================================================
-# 5. n8n 통신 함수
+# 5. QUERY PARAM RECOVERY
 # =========================================================
+#
+# Streamlit이 중간에 전체 rerun되더라도
+# URL에 request_id를 남겨 두어 분석 상태를 복구합니다.
+# =========================================================
+
+try:
+    saved_request_id = st.query_params.get("request_id")
+    saved_started_at = st.query_params.get("started_at")
+
+    if (
+        saved_request_id
+        and not st.session_state.request_id
+        and not st.session_state.analysis_result
+    ):
+        st.session_state.request_id = str(saved_request_id)
+        st.session_state.analysis_running = True
+
+        try:
+            st.session_state.analysis_started_at = float(saved_started_at)
+        except (TypeError, ValueError):
+            st.session_state.analysis_started_at = time.time()
+
+except Exception:
+    pass
+
+
+# =========================================================
+# 6. N8N API FUNCTIONS
+# =========================================================
+
 
 def start_analysis(payload: dict) -> str:
     """
-    분석용 n8n Workflow에 요청을 보내고
-    즉시 request_id를 받아옵니다.
+    메인 OpenDART Financial Analysis Workflow에 요청합니다.
+
+    n8n은 긴 분석을 기다리지 않고
+    Return Job ID 노드에서 request_id만 즉시 반환합니다.
     """
 
     if not START_WEBHOOK_URL:
         raise RuntimeError(
-            "START_WEBHOOK_URL이 설정되지 않았습니다."
+            "START_WEBHOOK_URL이 설정되지 않았습니다.\n"
+            "Streamlit Settings → Secrets를 확인해주세요."
         )
 
-    response = requests.post(
-        START_WEBHOOK_URL,
-        json=payload,
-        timeout=30,
-    )
+    try:
+        response = requests.post(
+            START_WEBHOOK_URL,
+            json=payload,
+            timeout=30,
+        )
+
+    except requests.exceptions.Timeout:
+        raise RuntimeError(
+            "분석 시작 Webhook 응답이 30초 안에 오지 않았습니다. "
+            "n8n의 Return Job ID가 긴 분석보다 먼저 실행되는지 확인해주세요."
+        )
 
     response.raise_for_status()
 
     try:
         data = response.json()
+
     except ValueError:
         raise RuntimeError(
-            f"분석 시작 Webhook이 JSON을 반환하지 않았습니다. "
-            f"응답 내용: {response.text[:500]}"
+            "분석 시작 Webhook이 JSON을 반환하지 않았습니다.\n"
+            f"응답: {response.text[:500]}"
         )
 
     request_id = data.get("request_id")
-    status = data.get("status")
 
-    if not request_id:
+    if request_id is None or str(request_id).strip() == "":
         raise RuntimeError(
-            f"n8n에서 request_id를 받지 못했습니다.\n응답: {data}"
-        )
-
-    if status not in (None, "processing", "queued", "started"):
-        raise RuntimeError(
-            f"분석 요청 상태가 예상과 다릅니다.\n응답: {data}"
+            "n8n에서 request_id를 받지 못했습니다.\n"
+            f"응답: {data}"
         )
 
     return str(request_id)
@@ -209,143 +254,209 @@ def start_analysis(payload: dict) -> str:
 
 def get_analysis_result(request_id: str) -> dict:
     """
-    Result Lookup Workflow를 호출해
-    현재 분석 상태를 확인합니다.
+    DCM Result Lookup Workflow에 request_id를 보내
+    Data Table의 현재 상태를 조회합니다.
     """
 
     if not RESULT_WEBHOOK_URL:
         raise RuntimeError(
-            "RESULT_WEBHOOK_URL이 설정되지 않았습니다."
+            "RESULT_WEBHOOK_URL이 설정되지 않았습니다.\n"
+            "Streamlit Settings → Secrets를 확인해주세요."
         )
 
     response = requests.get(
         RESULT_WEBHOOK_URL,
-        params={
-            "request_id": request_id
-        },
-        timeout=30,
+        params={"request_id": request_id},
+        timeout=20,
     )
 
     response.raise_for_status()
 
-    # n8n Get row(s) 결과가 없는 경우를 대비
+    # Data Table에서 아직 행을 찾지 못했거나
+    # 빈 응답이 올 경우 processing으로 간주
     if not response.text.strip():
         return {
             "status": "processing",
-            "result": ""
+            "result": "",
         }
 
     try:
         data = response.json()
+
     except ValueError:
         raise RuntimeError(
-            f"결과 조회 Webhook이 JSON을 반환하지 않았습니다. "
-            f"응답 내용: {response.text[:500]}"
+            "결과 조회 Webhook이 JSON을 반환하지 않았습니다.\n"
+            f"응답: {response.text[:500]}"
         )
 
-    # 혹시 배열 형태로 반환될 경우도 대응
+    # n8n 설정에 따라 배열로 반환되는 경우 대응
     if isinstance(data, list):
+
         if len(data) == 0:
             return {
                 "status": "processing",
-                "result": ""
+                "result": "",
             }
 
         data = data[0]
 
+    if not isinstance(data, dict):
+        return {
+            "status": "processing",
+            "result": "",
+        }
+
     return data
 
 
-def wait_for_analysis(
-    request_id: str,
-    max_wait_seconds: int = 900,
-    poll_interval: int = 5,
-):
-    """
-    n8n 분석이 끝날 때까지 주기적으로 조회합니다.
-    기본 최대 대기시간: 15분
-    """
+# =========================================================
+# 7. ANALYSIS STATUS FRAGMENT
+# =========================================================
+#
+# 기존 while True 방식은 사용하지 않습니다.
+#
+# 이 fragment만 5초마다 짧게 실행됩니다.
+# 따라서 5~15분짜리 n8n 실행을 Streamlit Python 실행 하나가
+# 계속 붙잡고 있지 않습니다.
+# =========================================================
 
-    started_at = time.time()
 
-    status_container = st.empty()
-    progress_bar = st.progress(0)
+@st.fragment(run_every="5s")
+def poll_analysis():
 
-    while True:
+    if not st.session_state.analysis_running:
+        return
 
-        elapsed = int(time.time() - started_at)
+    request_id = st.session_state.request_id
 
-        if elapsed > max_wait_seconds:
-            progress_bar.empty()
-            status_container.empty()
+    if not request_id:
+        return
 
-            raise TimeoutError(
-                "15분 동안 분석이 완료되지 않았습니다. "
-                "n8n Executions에서 해당 실행 상태를 확인해주세요."
-            )
+    # ---------------------------------------------
+    # 경과 시간 계산
+    # ---------------------------------------------
 
-        # 예상 8분 기준으로 진행률 표시
-        estimated_seconds = 480
+    started_at = st.session_state.analysis_started_at
 
-        progress = min(
-            int((elapsed / estimated_seconds) * 100),
-            95
+    if started_at is None:
+        started_at = time.time()
+        st.session_state.analysis_started_at = started_at
+
+    elapsed = max(
+        0,
+        int(time.time() - float(started_at))
+    )
+
+    minutes = elapsed // 60
+    seconds = elapsed % 60
+
+    # ---------------------------------------------
+    # 상태 UI
+    # ---------------------------------------------
+
+    st.info(
+        "🔎 공개자료를 최대한 확인하며 분석하고 있습니다. "
+        f"현재 {minutes}분 {seconds}초 경과"
+    )
+
+    # 실제 n8n 진행률이 아니라 참고용 시간 진행률
+    estimated_seconds = 600
+
+    progress = min(
+        int((elapsed / estimated_seconds) * 100),
+        95,
+    )
+
+    st.progress(progress)
+
+    st.caption(
+        "재무제표·채무구조·신용등급·회사채·시장금리·"
+        "CAPEX 등 공개자료를 확인하고 있습니다. "
+        "진행바는 예상시간 기준 참고용입니다."
+    )
+
+    # ---------------------------------------------
+    # 결과 조회
+    # ---------------------------------------------
+
+    try:
+        data = get_analysis_result(request_id)
+
+    except requests.exceptions.RequestException:
+        st.warning(
+            "결과 조회 과정에서 일시적인 연결 오류가 발생했습니다. "
+            "5초 후 자동으로 다시 확인합니다."
         )
+        return
 
-        progress_bar.progress(progress)
-
-        minutes = elapsed // 60
-        seconds = elapsed % 60
-
-        status_container.info(
-            f"🔎 공개자료를 최대한 확인하며 분석하고 있습니다. "
-            f"현재 {minutes}분 {seconds}초 경과"
+    except Exception as e:
+        st.warning(
+            "결과를 확인하는 중 일시적인 오류가 발생했습니다. "
+            f"자동으로 다시 확인합니다. ({e})"
         )
+        return
+
+    status = str(
+        data.get("status", "")
+    ).strip().lower()
+
+    # ---------------------------------------------
+    # 완료
+    # ---------------------------------------------
+
+    if status == "completed":
+
+        result = data.get("result")
+
+        if result is None:
+            result = ""
+
+        st.session_state.analysis_result = result
+        st.session_state.analysis_running = False
+        st.session_state.analysis_error = None
 
         try:
-            data = get_analysis_result(request_id)
+            st.query_params.clear()
+        except Exception:
+            pass
 
-        except requests.exceptions.RequestException:
-            # 조회 요청 자체가 한 번 실패해도
-            # 전체 분석을 즉시 중단하지 않고 다음 polling 때 재시도
-            time.sleep(poll_interval)
-            continue
+        st.rerun()
+        return
 
-        status = str(data.get("status", "")).lower().strip()
+    # ---------------------------------------------
+    # 실패
+    # ---------------------------------------------
 
-        if status == "completed":
+    if status in (
+        "error",
+        "failed",
+        "failure",
+    ):
 
-            progress_bar.progress(100)
+        error_message = (
+            data.get("result")
+            or data.get("error")
+            or "n8n 분석 과정에서 오류가 발생했습니다."
+        )
 
-            status_container.success(
-                "✅ 공개자료 조사가 완료되었습니다."
-            )
+        st.session_state.analysis_error = str(error_message)
+        st.session_state.analysis_running = False
 
-            result = data.get("result")
+        try:
+            st.query_params.clear()
+        except Exception:
+            pass
 
-            if result is None:
-                result = ""
+        st.rerun()
+        return
 
-            return result
-
-        if status in ("error", "failed", "failure"):
-
-            progress_bar.empty()
-            status_container.empty()
-
-            error_message = (
-                data.get("result")
-                or data.get("error")
-                or "n8n 분석 과정에서 오류가 발생했습니다."
-            )
-
-            raise RuntimeError(error_message)
-
-        time.sleep(poll_interval)
+    # 그 외:
+    # processing / queued / started / 빈 값
+    # → 아무것도 하지 않고 5초 후 다시 확인
 
 
 # =========================================================
-# 6. 사이드바 - 기업정보 입력
+# 8. SIDEBAR
 # =========================================================
 
 with st.sidebar:
@@ -355,25 +466,31 @@ with st.sidebar:
     company_name = st.text_input(
         "기업명",
         value="LG디스플레이",
-        help="분석 대상 기업명을 입력하세요."
+        help="분석 대상 기업명을 입력하세요.",
     )
 
     corp_code = st.text_input(
         "DART corp_code",
         value="00105873",
-        help="OpenDART 고유번호 8자리를 입력하세요."
+        help="OpenDART 기업 고유번호 8자리를 입력하세요.",
     )
 
     st.markdown("### 분석 범위")
-    st.info(
-        "분석기간: 2025.01.01 ~ 2026.06.30\n\n"
-        "분석기준일: 2026.06.30"
+
+    st.markdown(
+        """
+        <div class="scope-box">
+        <b>분석기간:</b> 2025.01.01 ~ 2026.06.30<br>
+        <b>분석기준일:</b> 2026.06.30
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     funding_amount = st.text_input(
         "조달예정금액",
         value="3000억원",
-        help="예: 3000억원"
+        help="예: 3000억원",
     )
 
     funding_purpose = st.text_area(
@@ -381,19 +498,53 @@ with st.sidebar:
         value="차환 및 운영자금",
         height=130,
         help=(
-            "사용자가 예상하는 목적을 입력하세요. "
+            "사용자가 예상하는 자금조달 목적입니다. "
             "최종 분석에서는 설비투자·운전자금·차환을 모두 검토합니다."
         ),
     )
 
+    # 분석 중에는 중복 Analyze 방지
     analyze_clicked = st.button(
         "Analyze",
         type="primary",
         use_container_width=True,
+        disabled=st.session_state.analysis_running,
     )
 
+    # 분석 진행 중일 때 현재 Job 표시
+    if st.session_state.analysis_running:
+        st.caption(
+            f"현재 분석 Job ID: "
+            f"{st.session_state.request_id}"
+        )
+
+    # 결과 또는 오류가 있을 때 새 분석 버튼
+    if (
+        st.session_state.analysis_result is not None
+        or st.session_state.analysis_error is not None
+    ):
+
+        if st.button(
+            "새 분석 시작",
+            use_container_width=True,
+        ):
+            st.session_state.analysis_result = None
+            st.session_state.request_id = None
+            st.session_state.analysis_running = False
+            st.session_state.analysis_started_at = None
+            st.session_state.analysis_error = None
+            st.session_state.last_company = None
+
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
+
+            st.rerun()
+
+
 # =========================================================
-# 7. 메인 화면
+# 9. MAIN HEADER
 # =========================================================
 
 st.markdown(
@@ -407,9 +558,11 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="sub-title">'
-    'AI-POWERED CORPORATE FUNDING ANALYSIS'
-    '</div>',
+    """
+    <div class="sub-title">
+    AI-POWERED CORPORATE FUNDING ANALYSIS
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
@@ -420,27 +573,47 @@ st.markdown(
 
 
 # =========================================================
-# 8. Analyze 실행
+# 10. ANALYZE REQUEST
 # =========================================================
 
 if analyze_clicked:
 
-    # 이전 결과 초기화
+    # ---------------------------------------------
+    # 이전 상태 초기화
+    # ---------------------------------------------
+
     st.session_state.analysis_result = None
+    st.session_state.analysis_error = None
     st.session_state.request_id = None
+    st.session_state.analysis_running = False
+    st.session_state.analysis_started_at = None
+
+    # ---------------------------------------------
+    # Payload
+    # ---------------------------------------------
+    #
+    # 분석범위:
+    # 2025 Annual + 2026 H1
+    #
+    # n8n에서
+    # annual_year / annual_reprt_code
+    # half_year / half_reprt_code
+    # 를 사용할 수 있도록 함께 전달
+    # ---------------------------------------------
 
     payload = {
         "company_name": company_name.strip(),
         "corp_code": corp_code.strip(),
 
-        # 분석 범위 고정
         "analysis_start_date": "2025-01-01",
         "analysis_end_date": "2026-06-30",
         "analysis_base_date": "2026-06-30",
 
-        # DART 조회 기준
+        # 2025 사업보고서
         "annual_year": 2025,
         "annual_reprt_code": "11011",
+
+        # 2026 반기보고서
         "half_year": 2026,
         "half_reprt_code": "11012",
 
@@ -448,7 +621,10 @@ if analyze_clicked:
         "funding_purpose": funding_purpose.strip(),
     }
 
-    # 필수 입력 검증
+    # ---------------------------------------------
+    # 필수값 확인
+    # ---------------------------------------------
+
     missing = []
 
     if not payload["company_name"]:
@@ -458,36 +634,50 @@ if analyze_clicked:
         missing.append("DART corp_code")
 
     if missing:
+
         st.error(
             "다음 항목을 입력해주세요: "
             + ", ".join(missing)
         )
 
     else:
+
         try:
-            # 1. n8n 분석 시작 요청
-            with st.spinner("분석 요청을 등록하고 있습니다..."):
+
+            with st.spinner(
+                "n8n에 분석 요청을 등록하고 있습니다..."
+            ):
+
                 request_id = start_analysis(payload)
 
-                st.session_state.request_id = request_id
-                st.session_state.last_company = company_name
+            # -------------------------------------
+            # Job 상태 저장
+            # -------------------------------------
 
-            # 2. 결과 조회
-            result = wait_for_analysis(
-                request_id=request_id,
-                max_wait_seconds=900,
-                poll_interval=5,
-            )
+            started_at = time.time()
 
-            st.session_state.analysis_result = result
+            st.session_state.request_id = str(request_id)
+            st.session_state.analysis_running = True
+            st.session_state.analysis_started_at = started_at
+            st.session_state.last_company = company_name
 
-        except requests.exceptions.Timeout:
-            st.error(
-                "n8n 서버 연결 시간이 초과되었습니다. "
-                "n8n 실행 상태를 확인해주세요."
-            )
+            # -------------------------------------
+            # URL에도 저장
+            #
+            # Streamlit 전체 rerun / 새로고침이 발생해도
+            # 진행 중 Job을 복구하기 위한 장치
+            # -------------------------------------
+
+            try:
+                st.query_params["request_id"] = str(request_id)
+                st.query_params["started_at"] = str(started_at)
+            except Exception:
+                pass
+
+            st.rerun()
 
         except requests.exceptions.HTTPError as e:
+
             status_code = (
                 e.response.status_code
                 if e.response is not None
@@ -500,43 +690,71 @@ if analyze_clicked:
                 else ""
             )
 
-            st.error(
-                f"n8n Webhook 호출 중 HTTP 오류가 발생했습니다.\n\n"
+            st.session_state.analysis_error = (
+                "n8n Webhook 호출 중 HTTP 오류가 발생했습니다.\n\n"
                 f"상태 코드: {status_code}\n\n"
                 f"{response_text}"
             )
 
+            st.session_state.analysis_running = False
+            st.rerun()
+
         except Exception as e:
-            st.error(
-                f"분석 중 오류가 발생했습니다.\n\n{e}"
-            )
+
+            st.session_state.analysis_error = str(e)
+            st.session_state.analysis_running = False
+            st.rerun()
+
+
 # =========================================================
-# 9. 분석 결과 표시
+# 11. MAIN CONTENT
 # =========================================================
 
-if st.session_state.analysis_result:
+if st.session_state.analysis_running:
+
+    poll_analysis()
+
+
+elif st.session_state.analysis_error:
+
+    st.error(
+        "분석 중 오류가 발생했습니다.\n\n"
+        f"{st.session_state.analysis_error}"
+    )
+
+
+elif st.session_state.analysis_result is not None:
+
+    st.success(
+        "✅ 공개자료 조사가 완료되었습니다."
+    )
 
     st.markdown(
-        '<div class="result-title">'
-        '기업 자금조달 분석 결과'
-        '</div>',
+        """
+        <div class="result-title">
+        기업 자금조달 분석 결과
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     result = st.session_state.analysis_result
 
-    # 문자열이면 Markdown 그대로 출력
     if isinstance(result, str):
 
-        st.markdown(result)
+        if result.strip():
+            st.markdown(result)
+        else:
+            st.warning(
+                "분석은 완료되었지만 최종 결과가 비어 있습니다. "
+                "n8n의 Update Job Result 노드를 확인해주세요."
+            )
 
-    # 혹시 dict / list 형태가 넘어오면 JSON으로 표시
     else:
-
         st.json(result)
 
 
-elif not analyze_clicked:
+else:
 
     st.markdown(
         """
@@ -550,7 +768,7 @@ elif not analyze_clicked:
 
 
 # =========================================================
-# 10. 하단 안내
+# 12. FOOTER
 # =========================================================
 
 st.markdown(
@@ -561,9 +779,9 @@ st.markdown(
 st.markdown(
     """
     <div class="disclaimer">
-    본 도구는 공개 공시자료와 공개 웹자료를 기반으로 기업의
-    자금조달 니즈를 분석하는 보조 도구이며 실제 투자 또는
-    발행 의사결정을 대체하지 않습니다.
+    본 도구는 공개 공시자료와 공개 웹자료를 기반으로
+    기업의 자금조달 니즈를 분석하는 보조 도구이며
+    실제 투자 또는 발행 의사결정을 대체하지 않습니다.
     </div>
     """,
     unsafe_allow_html=True,

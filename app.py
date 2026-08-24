@@ -31,20 +31,6 @@ RESULT_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/dcm-result"
 # 반드시 /webhook-test/ 가 아니라 /webhook/ Production URL 사용
 # =========================================================
 
-def get_config(name: str) -> str:
-    try:
-        if name in st.secrets:
-            return str(st.secrets[name])
-    except Exception:
-        pass
-
-    return os.getenv(name, "")
-
-
-START_WEBHOOK_URL = get_config("START_WEBHOOK_URL")
-RESULT_WEBHOOK_URL = get_config("RESULT_WEBHOOK_URL")
-
-
 # =========================================================
 # 3. DESIGN / CSS
 # =========================================================

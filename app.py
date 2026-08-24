@@ -583,6 +583,7 @@ if analyze_clicked:
     # half_year / half_reprt_code
     # 를 사용할 수 있도록 함께 전달
     # ---------------------------------------------
+st.write("DEBUG funding_purpose:", repr(funding_purpose))
     payload = {
         "company_name": company_name.strip(),
         "corp_code": corp_code.strip(),

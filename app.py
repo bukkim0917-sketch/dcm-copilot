@@ -32,19 +32,8 @@ st.set_page_config(
 # =========================================================
 
 
-def get_config(name: str) -> str:
-    """Streamlit Secrets → 환경변수 순서로 설정값을 읽습니다."""
-    try:
-        if name in st.secrets:
-            return str(st.secrets[name])
-    except Exception:
-        pass
-
-    return os.getenv(name, "")
-
-
-START_WEBHOOK_URL = get_config("START_WEBHOOK_URL")
-RESULT_WEBHOOK_URL = get_config("RESULT_WEBHOOK_URL")
+START_WEBHOOK_URL = st.secrets["START_WEBHOOK_URL"]
+RESULT_WEBHOOK_URL = st.secrets["RESULT_WEBHOOK_URL"]
 
 
 # =========================================================

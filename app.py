@@ -305,7 +305,7 @@ def get_analysis_result(request_id: str) -> dict:
 # =========================================================
 
 
-@st.fragment(run_every="5s")
+@st.fragment(run_every="60s")
 def poll_analysis():
 
     if not st.session_state.analysis_running:

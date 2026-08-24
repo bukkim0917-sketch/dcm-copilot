@@ -454,9 +454,17 @@ if analyze_clicked:
 payload = {
     "company_name": company_name.strip(),
     "corp_code": corp_code.strip(),
-    "year": int(year),
-    "report_period": report_period,
-    "reprt_code": reprt_code,
+
+    "analysis_start_date": "2025-01-01",
+    "analysis_end_date": "2026-06-30",
+    "analysis_base_date": "2026-06-30",
+
+    "annual_year": 2025,
+    "annual_reprt_code": "11011",
+
+    "half_year": 2026,
+    "half_reprt_code": "11012",
+
     "funding_amount": funding_amount.strip(),
     "funding_purpose": funding_purpose.strip(),
 }

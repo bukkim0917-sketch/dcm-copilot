@@ -31,17 +31,17 @@ st.set_page_config(
 try:
     START_WEBHOOK_URL = st.secrets.get(
         "START_WEBHOOK_URL",
-        os.getenv("START_WEBHOOK_URL", "")
+        os.getenv("START_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/DCM-analysis")
     )
 
     RESULT_WEBHOOK_URL = st.secrets.get(
         "RESULT_WEBHOOK_URL",
-        os.getenv("RESULT_WEBHOOK_URL", "")
+        os.getenv("RESULT_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/dcm-result")
     )
 
 except Exception:
-    START_WEBHOOK_URL = os.getenv("START_WEBHOOK_URL", "")
-    RESULT_WEBHOOK_URL = os.getenv("RESULT_WEBHOOK_URL", "")
+    START_WEBHOOK_URL = os.getenv("START_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/DCM-analysis")
+    RESULT_WEBHOOK_URL = os.getenv("RESULT_WEBHOOK_URL", "https://buky87.app.n8n.cloud/webhook/dcm-result")
 
 
 # =========================================================

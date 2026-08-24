@@ -195,8 +195,73 @@ def call_webhook(url: str, payload: dict) -> dict:
     n8n 웹훅에 POST 요청을 보내고 응답을 dict 로 반환한다.
     네트워크/HTTP 오류는 예외로 올려보내고, 호출부에서 처리한다.
     """
-    response = requests.post(url, json=payload, timeout=REQUEST_TIMEOUT_SECONDS)
-    response.raise_for_status()
+import time
+import requests
+import streamlit as st
+
+START_WEBHOOK_URL = "여기에 기존 분석 Webhook Production URL"
+RESULT_WEBHOOK_URL = "여기에 새 dcm-result Webhook Production URL"
+
+
+def run_analysis(payload):
+    # 1. 분석 요청 → request_id만 바로 받음
+    start_response = requests.post(
+        START_WEBHOOK_URL,
+        json=payload,
+        timeout=30
+    )
+    start_response.raise_for_status()
+
+    start_data = start_response.json()
+
+    request_id = str(start_data.get("request_id", ""))
+
+    if not request_id:
+        raise ValueError(
+            f"n8n에서 request_id를 받지 못했습니다. 응답: {start_data}"
+        )
+
+    # 2. 결과가 나올 때까지 조회
+    status_box = st.empty()
+
+    started_at = time.time()
+    max_wait_seconds = 900       # 최대 15분
+    poll_interval = 5            # 5초마다 확인
+
+    while time.time() - started_at < max_wait_seconds:
+
+        elapsed = int(time.time() - started_at)
+
+        status_box.info(
+            f"🔎 공개자료를 분석하고 있습니다... ({elapsed}초 경과)"
+        )
+
+        result_response = requests.get(
+            RESULT_WEBHOOK_URL,
+            params={"request_id": request_id},
+            timeout=30
+        )
+
+        result_response.raise_for_status()
+
+        result_data = result_response.json()
+
+        status = result_data.get("status")
+
+        if status == "completed":
+            status_box.success("✅ 분석이 완료되었습니다.")
+            return result_data.get("result", "")
+
+        if status == "error":
+            raise RuntimeError(
+                result_data.get("result", "n8n 분석 중 오류가 발생했습니다.")
+            )
+
+        time.sleep(poll_interval)
+
+    raise TimeoutError(
+        "15분 동안 분석 결과를 받지 못했습니다. n8n 실행 로그를 확인해주세요."
+    )
 
     try:
         data = response.json()

@@ -429,23 +429,25 @@ if analyze_clicked:
     st.session_state.analysis_result = None
     st.session_state.request_id = None
 
-payload = {
-    "company_name": company_name.strip(),
-    "corp_code": corp_code.strip(),
+    payload = {
+        "company_name": company_name.strip(),
+        "corp_code": corp_code.strip(),
 
-    "analysis_start_date": "2025-01-01",
-    "analysis_end_date": "2026-06-30",
-    "analysis_base_date": "2026-06-30",
+        # 분석 범위 고정
+        "analysis_start_date": "2025-01-01",
+        "analysis_end_date": "2026-06-30",
+        "analysis_base_date": "2026-06-30",
 
-    "annual_year": 2025,
-    "annual_reprt_code": "11011",
+        # DART 조회 기준
+        "annual_year": 2025,
+        "annual_reprt_code": "11011",
+        "half_year": 2026,
+        "half_reprt_code": "11012",
 
-    "half_year": 2026,
-    "half_reprt_code": "11012",
+        "funding_amount": funding_amount.strip(),
+        "funding_purpose": funding_purpose.strip(),
+    }
 
-    "funding_amount": funding_amount.strip(),
-    "funding_purpose": funding_purpose.strip(),
-}
     # 필수 입력 검증
     missing = []
 
@@ -456,32 +458,21 @@ payload = {
         missing.append("DART corp_code")
 
     if missing:
-
         st.error(
             "다음 항목을 입력해주세요: "
             + ", ".join(missing)
         )
 
     else:
-
         try:
-
-            # ---------------------------------------------
-            # 1) n8n에 분석 시작 요청
-            # ---------------------------------------------
-            with st.spinner(
-                "분석 요청을 등록하고 있습니다..."
-            ):
-
+            # 1. n8n 분석 시작 요청
+            with st.spinner("분석 요청을 등록하고 있습니다..."):
                 request_id = start_analysis(payload)
 
                 st.session_state.request_id = request_id
                 st.session_state.last_company = company_name
 
-
-            # ---------------------------------------------
-            # 2) 결과 polling
-            # ---------------------------------------------
+            # 2. 결과 조회
             result = wait_for_analysis(
                 request_id=request_id,
                 max_wait_seconds=900,
@@ -490,17 +481,13 @@ payload = {
 
             st.session_state.analysis_result = result
 
-
         except requests.exceptions.Timeout:
-
             st.error(
                 "n8n 서버 연결 시간이 초과되었습니다. "
                 "n8n 실행 상태를 확인해주세요."
             )
 
-
         except requests.exceptions.HTTPError as e:
-
             status_code = (
                 e.response.status_code
                 if e.response is not None
@@ -519,14 +506,10 @@ payload = {
                 f"{response_text}"
             )
 
-
         except Exception as e:
-
             st.error(
                 f"분석 중 오류가 발생했습니다.\n\n{e}"
             )
-
-
 # =========================================================
 # 9. 분석 결과 표시
 # =========================================================

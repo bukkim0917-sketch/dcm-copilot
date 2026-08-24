@@ -25,8 +25,8 @@ st.set_page_config(
 #
 # 아래 두 값을 등록해야 합니다.
 #
-# START_WEBHOOK_URL = "기존 OpenDART Financial Analysis Production URL"
-# RESULT_WEBHOOK_URL = "DCM Result Lookup Production URL"
+# START_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/DCM-analysis"
+# RESULT_WEBHOOK_URL = "https://buky87.app.n8n.cloud/webhook/dcm-result"
 #
 # 반드시 /webhook-test/ 가 아니라 /webhook/ Production URL 사용
 # =========================================================

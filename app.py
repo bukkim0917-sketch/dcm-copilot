@@ -583,7 +583,6 @@ if analyze_clicked:
     # half_year / half_reprt_code
     # 를 사용할 수 있도록 함께 전달
     # ---------------------------------------------
-
     payload = {
         "company_name": company_name.strip(),
         "corp_code": corp_code.strip(),
@@ -602,6 +601,7 @@ if analyze_clicked:
 
         "funding_amount": funding_amount.strip(),
         "funding_purpose": funding_purpose.strip(),
+        "debug_funding_purpose": repr(funding_purpose),
     }
 
     # ---------------------------------------------

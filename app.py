@@ -602,6 +602,7 @@ st.write("DEBUG funding_purpose:", repr(funding_purpose))
 
         "funding_amount": funding_amount.strip(),
         "funding_purpose": funding_purpose.strip(),
+        "debug_funding_purpose": repr(funding_purpose),
     }
 
     # ---------------------------------------------

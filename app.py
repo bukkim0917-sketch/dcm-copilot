@@ -31,9 +31,18 @@ st.set_page_config(
 # 반드시 /webhook-test/ 가 아니라 /webhook/ Production URL 사용
 # =========================================================
 
+def get_config(name: str) -> str:
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:
+        pass
 
-START_WEBHOOK_URL = st.secrets["START_WEBHOOK_URL"]
-RESULT_WEBHOOK_URL = st.secrets["RESULT_WEBHOOK_URL"]
+    return os.getenv(name, "")
+
+
+START_WEBHOOK_URL = get_config("START_WEBHOOK_URL")
+RESULT_WEBHOOK_URL = get_config("RESULT_WEBHOOK_URL")
 
 
 # =========================================================

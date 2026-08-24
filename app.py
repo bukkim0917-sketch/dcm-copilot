@@ -364,32 +364,11 @@ with st.sidebar:
         help="OpenDART 고유번호 8자리를 입력하세요."
     )
 
-    year = st.number_input(
-        "분석연도",
-        min_value=2015,
-        max_value=2035,
-        value=2025,
-        step=1,
+    st.markdown("### 분석 범위")
+    st.info(
+        "분석기간: 2025.01.01 ~ 2026.06.30\n\n"
+        "분석기준일: 2026.06.30"
     )
-    report_period = st.selectbox(
-    "분석기간",
-    options=[
-        "사업보고서(연간)",
-        "반기보고서",
-        "1분기보고서",
-        "3분기보고서",
-    ],
-    index=0,
-)
-
-report_code_map = {
-    "사업보고서(연간)": "11011",
-    "반기보고서": "11012",
-    "1분기보고서": "11013",
-    "3분기보고서": "11014",
-}
-
-reprt_code = report_code_map[report_period]
 
     funding_amount = st.text_input(
         "조달예정금액",
@@ -412,7 +391,6 @@ reprt_code = report_code_map[report_period]
         type="primary",
         use_container_width=True,
     )
-
 
 # =========================================================
 # 7. 메인 화면

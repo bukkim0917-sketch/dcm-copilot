@@ -41,8 +41,8 @@ def get_config(name: str) -> str:
     return os.getenv(name, "")
 
 
-START_WEBHOOK_URL = get_config("START_WEBHOOK_URL")
-RESULT_WEBHOOK_URL = get_config("RESULT_WEBHOOK_URL")
+START_WEBHOOK_URL = get_config("https://buky87.app.n8n.cloud/webhook/DCM-analysis")
+RESULT_WEBHOOK_URL = get_config("https://buky87.app.n8n.cloud/webhook/dcm-result")
 
 
 # =========================================================

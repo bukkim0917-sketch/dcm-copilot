@@ -358,9 +358,26 @@ with st.sidebar:
             height=120,
         )
 
-        submitted = st.form_submit_button(
-            "Analyze", type="primary", use_container_width=True
-        )
+if st.button("Analyze"):
+
+    payload = {
+        "company_name": company_name,
+        "corp_code": corp_code,
+        "year": year,
+        "funding_amount": funding_amount,
+        "funding_purpose": funding_purpose,
+    }
+
+    try:
+        result = run_analysis(payload)
+
+        if result:
+            st.markdown(result)
+        else:
+            st.warning("분석은 완료되었지만 결과가 비어 있습니다.")
+
+    except Exception as e:
+        st.error(f"분석 중 오류가 발생했습니다: {e}")
 
     st.caption("입력값은 n8n 워크플로우로 전송되어 AI 분석에 사용됩니다.")
 
